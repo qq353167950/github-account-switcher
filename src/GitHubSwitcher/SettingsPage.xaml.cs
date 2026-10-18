@@ -22,7 +22,7 @@ public partial class SettingsPage : UserControl, IRefreshable
         UpdateDiagnostics();
     }
 
-    // ---------------------------------------------------------------- ABE
+    // ---------------------------------------------------------------- ABE 状态
 
     private void UpdateAbe()
     {
@@ -95,6 +95,23 @@ public partial class SettingsPage : UserControl, IRefreshable
         AbeBadgeText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(fg));
     }
 
+    private static string DescribeAbe(AbeStatus s) => s.State switch
+    {
+        AbeState.Disabled => "未启用（正常）",
+        AbeState.DisabledByPolicy => "已通过策略关闭",
+        AbeState.Enabled => "已启用（受影响）",
+        _ => "无法判断"
+    };
+
+    private void SetResult(string text, bool ok)
+    {
+        AbeResult.Text = text;
+        AbeResult.Foreground = new SolidColorBrush(
+            (Color)ColorConverter.ConvertFromString(ok ? "#1A7F37" : "#C0392B"));
+    }
+
+    // ---------------------------------------------------------------- 按钮
+
     private void AbeFix_Click(object sender, RoutedEventArgs e)
     {
         var dr = MessageBox.Show(
@@ -107,9 +124,7 @@ public partial class SettingsPage : UserControl, IRefreshable
         if (dr != MessageBoxResult.Yes) return;
 
         var (ok, msg) = AbeService.DisableAbe();
-        AbeResult.Text = msg;
-        AbeResult.Foreground = new SolidColorBrush(
-            (Color)ColorConverter.ConvertFromString(ok ? "#1A7F37" : "#C0392B"));
+        SetResult(msg, ok);
 
         if (ok)
         {
@@ -144,9 +159,7 @@ public partial class SettingsPage : UserControl, IRefreshable
         if (dr != MessageBoxResult.Yes) return;
 
         var (ok, msg) = AbeService.RepairFromV20(deleteCookies: true);
-        AbeResult.Text = msg;
-        AbeResult.Foreground = new SolidColorBrush(
-            (Color)ColorConverter.ConvertFromString(ok ? "#1A7F37" : "#C0392B"));
+        SetResult(msg, ok);
 
         MessageBox.Show(msg, ok ? "修复完成" : "修复失败",
             MessageBoxButton.OK, ok ? MessageBoxImage.Information : MessageBoxImage.Warning);
@@ -164,17 +177,28 @@ public partial class SettingsPage : UserControl, IRefreshable
         if (dr != MessageBoxResult.Yes) return;
 
         var (ok, msg) = AbeService.RestoreDefault();
-        AbeResult.Text = msg;
-        AbeResult.Foreground = new SolidColorBrush(
-            (Color)ColorConverter.ConvertFromString(ok ? "#1A7F37" : "#C0392B"));
+        SetResult(msg, ok);
         UpdateAbe();
         UpdateDiagnostics();
     }
 
+    /// <summary>
+    /// 重新检测。
+    /// 说明：如果检测结果与上次相同，界面上看不出变化，用户会以为按钮没反应。
+    /// 所以这里必须给出可见反馈：时间戳 + 关键结论。
+    /// </summary>
     private void Recheck_Click(object sender, RoutedEventArgs e)
     {
-        AbeResult.Text = "";
+        var v20Before = AbeService.CountV20Cookies();
         Refresh();
+        var after = AbeService.Inspect();
+        var v20After = AbeService.CountV20Cookies();
+
+        SetResult(
+            $"已于 {DateTime.Now:HH:mm:ss} 重新检测\n" +
+            $"App-Bound 加密：{DescribeAbe(after)}；v20 cookie：{v20After} 条" +
+            (v20Before == v20After ? "（与上次一致）" : $"（上次 {v20Before} 条）"),
+            after.CanInject);
     }
 
     // ---------------------------------------------------------------- 环境自检
