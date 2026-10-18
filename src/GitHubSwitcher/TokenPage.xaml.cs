@@ -17,7 +17,7 @@ public partial class TokenPage : UserControl, IRefreshable
 {
     private readonly MainWindow _window;
     private readonly GitHubApi _api = new();
-    private readonly ObservableCollection<ScopeRow> _scopes = new();
+    private readonly ObservableCollection<ScopeGroup> _groups = new();
     private bool _syncing;
 
     public TokenPage(MainWindow window)
@@ -25,24 +25,39 @@ public partial class TokenPage : UserControl, IRefreshable
         InitializeComponent();
         _window = window;
 
-        foreach (var s in ScopeCatalog.All)
+        foreach (var cat in ScopeCatalog.CategoryOrder)
         {
-            _scopes.Add(new ScopeRow
+            var group = new ScopeGroup { Title = cat };
+            foreach (var s in ScopeCatalog.All.Where(s => s.Category == cat))
             {
-                Name = s.Name,
-                Description = s.Description,
-                IsDangerous = s.IsDangerous,
-                IsSelected = s.IsDefault
-            });
+                group.Rows.Add(new ScopeRow
+                {
+                    Name = s.Name,
+                    Description = s.Description,
+                    IsDangerous = s.IsDangerous,
+                    IsSelected = s.IsDefault
+                });
+            }
+            _groups.Add(group);
         }
-        ScopeList.ItemsSource = _scopes;
-        foreach (var r in _scopes) r.PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName == nameof(ScopeRow.IsSelected)) ApplyImplication(r);
-            UpdateHint();
-        };
 
-        // 有效期选项（value 为天数；null = 无期限；-1 = 自定义日期）
+        // 摘要跟随勾选变化
+        foreach (var g in _groups)
+            foreach (var r in g.Rows)
+                r.PropertyChanged += (_, e) =>
+                {
+                    if (e.PropertyName == nameof(ScopeRow.IsSelected))
+                    {
+                        ApplyImplication(r);
+                        g.RefreshSummary();
+                    }
+                    UpdateHint();
+                };
+
+        GroupList.ItemsSource = _groups;
+        foreach (var g in _groups) g.RefreshSummary();
+
+        // 有效期选项（Days：null = 无期限；-1 = 自定义日期）
         ExpirationCombo.ItemsSource = new List<ExpirationOption>
         {
             new() { Label = "无期限（不过期）", Days = null },
@@ -57,36 +72,9 @@ public partial class TokenPage : UserControl, IRefreshable
         UpdateHint();
     }
 
-    private void ExpirationCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (ExpirationDate == null) return;
-        var opt = ExpirationCombo.SelectedItem as ExpirationOption;
-        var custom = opt?.Days == -1;
-        ExpirationDate.Visibility = custom ? Visibility.Visible : Visibility.Collapsed;
-        ExpirationHint.Text = custom
-            ? "输入具体日期，格式 YYYY-MM-DD"
-            : (opt?.Days == null ? "token 永不过期" : $"token 将在 {opt!.Days} 天后过期");
-    }
+    // ---------------------------------------------------------------- 权限联动
 
-    /// <summary>返回 expiration 查询参数值；null 表示不加该参数（无期限）。</summary>
-    private string? GetExpirationValue()
-    {
-        var opt = ExpirationCombo.SelectedItem as ExpirationOption;
-        if (opt == null || opt.Days == null) return null; // 无期限
-        if (opt.Days == -1)
-        {
-            var d = ExpirationDate.Text.Trim();
-            return DateOnly.TryParseExact(d, "yyyy-MM-dd", out var parsed)
-                ? parsed.ToString("yyyy-MM-dd") : d; // 非法格式原样带过去，让 GitHub 页面提示
-        }
-        return DateOnly.FromDateTime(DateTime.Today.AddDays(opt.Days.Value)).ToString("yyyy-MM-dd");
-    }
-
-    private sealed class ExpirationOption
-    {
-        public string Label { get; init; } = "";
-        public int? Days { get; init; }
-    }
+    private IEnumerable<ScopeRow> AllRows => _groups.SelectMany(g => g.Rows);
 
     /// <summary>勾选 admin:* 时自动勾选被蕴含的 read:/write:* 并标注；取消时随之取消。</summary>
     private void ApplyImplication(ScopeRow changed)
@@ -100,7 +88,7 @@ public partial class TokenPage : UserControl, IRefreshable
             {
                 foreach (var c in children)
                 {
-                    var row = _scopes.FirstOrDefault(s =>
+                    var row = AllRows.FirstOrDefault(s =>
                         string.Equals(s.Name, c, StringComparison.OrdinalIgnoreCase));
                     if (row == null) continue; // repo 的子项不在 UI 列表里
                     row.IsSelected = true;
@@ -109,19 +97,107 @@ public partial class TokenPage : UserControl, IRefreshable
             }
             else if (!changed.IsSelected)
             {
-                foreach (var row in _scopes.Where(s => s.IncludedBy == changed.Name))
+                foreach (var row in AllRows.Where(s => s.IncludedBy == changed.Name))
                 {
                     row.IncludedBy = "";
                     row.IsSelected = false;
                 }
             }
 
-            // 子项被单独取消时，清掉它的包含标注（父项勾选保持不变）
             if (!changed.IsSelected && !string.IsNullOrEmpty(changed.IncludedBy))
                 changed.IncludedBy = "";
         }
         finally { _syncing = false; }
     }
+
+    // ---------------------------------------------------------------- 全选/清空/默认
+
+    private void SelectAll_Click(object sender, RoutedEventArgs e)
+    {
+        _syncing = true;
+        try
+        {
+            foreach (var r in AllRows)
+            {
+                r.IsSelected = true;
+                if (ScopeCatalog.Implies.TryGetValue(r.Name, out var children))
+                    foreach (var c in children)
+                    {
+                        var row = AllRows.FirstOrDefault(s =>
+                            string.Equals(s.Name, c, StringComparison.OrdinalIgnoreCase));
+                        if (row != null) { row.IsSelected = true; row.IncludedBy = r.Name; }
+                    }
+            }
+        }
+        finally { _syncing = false; }
+        foreach (var g in _groups) g.RefreshSummary();
+        UpdateHint();
+    }
+
+    private void SelectNone_Click(object sender, RoutedEventArgs e)
+    {
+        _syncing = true;
+        try
+        {
+            foreach (var r in AllRows) { r.IsSelected = false; r.IncludedBy = ""; }
+        }
+        finally { _syncing = false; }
+        foreach (var g in _groups) g.RefreshSummary();
+        UpdateHint();
+    }
+
+    private void SelectDefault_Click(object sender, RoutedEventArgs e)
+    {
+        _syncing = true;
+        try
+        {
+            foreach (var r in AllRows)
+            {
+                r.IncludedBy = "";
+                r.IsSelected = ScopeCatalog.Find(r.Name)?.IsDefault == true;
+            }
+        }
+        finally { _syncing = false; }
+        foreach (var g in _groups) g.RefreshSummary();
+        UpdateHint();
+    }
+
+    // ---------------------------------------------------------------- 有效期
+
+    private void ExpirationCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (ExpirationDate == null) return;
+        var opt = ExpirationCombo.SelectedItem as ExpirationOption;
+        var custom = opt?.Days == -1;
+        ExpirationDate.Visibility = custom ? Visibility.Visible : Visibility.Collapsed;
+        ExpirationHint.Text = custom
+            ? "输入具体日期，格式 YYYY-MM-DD"
+            : (opt?.Days == null ? "token 永不过期" : $"token 将在 {opt!.Days} 天后过期");
+    }
+
+    /// <summary>返回用户选择的到期时间；null = 无期限；自定义日期非法时返回 null 并提示。</summary>
+    private DateTimeOffset? GetExpiration()
+    {
+        var opt = ExpirationCombo.SelectedItem as ExpirationOption;
+        if (opt == null || opt.Days == null) return null;
+        if (opt.Days == -1)
+        {
+            var d = ExpirationDate.Text.Trim();
+            if (DateOnly.TryParseExact(d, "yyyy-MM-dd", out var parsed))
+                return new DateTimeOffset(parsed.ToDateTime(TimeOnly.MaxValue), TimeZoneInfo.Local.GetUtcOffset(DateTime.Now));
+            TokenStatus.Text = "自定义日期格式应为 YYYY-MM-DD，将按无期限生成链接。";
+            return null;
+        }
+        return DateTimeOffset.Now.AddDays(opt.Days.Value);
+    }
+
+    private sealed class ExpirationOption
+    {
+        public string Label { get; init; } = "";
+        public int? Days { get; init; }
+    }
+
+    // ---------------------------------------------------------------- 账号/显示
 
     /// <summary>选中指定账号（供「导入账号」后直接跳转过来使用）。</summary>
     public void SelectAccount(string login)
@@ -173,13 +249,31 @@ public partial class TokenPage : UserControl, IRefreshable
 
         ExistingCard.Visibility = Visibility.Visible;
         ExistingToken.Text = token;
+
+        var exp = SecureStore.GetExpiration(acc.Login);
+        ExpirationInfo.Text = DescribeExpiration(exp);
+        ExpirationInfo.Foreground = new System.Windows.Media.SolidColorBrush(
+            (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(
+                exp is { } e && e <= DateTimeOffset.Now ? "#C0392B" : "#1A7F37"));
+
         ExistingScopes.Text = "点「校验并保存」可刷新它的权限列表。";
+    }
+
+    /// <summary>生成到期时间的展示文案。</summary>
+    public static string DescribeExpiration(DateTimeOffset? exp)
+    {
+        if (exp == null) return "有效期：无期限（不过期）";
+        var remain = exp.Value - DateTimeOffset.Now;
+        if (remain <= TimeSpan.Zero) return $"已过期（{exp.Value:yyyy-MM-dd}）—— 请重新创建 token";
+        if (remain.TotalDays >= 1)
+            return $"有效期至 {exp.Value:yyyy-MM-dd}（剩余 {Math.Floor(remain.TotalDays)} 天）";
+        return $"有效期至 {exp.Value:yyyy-MM-dd HH:mm}（剩余 {Math.Ceiling(remain.TotalHours)} 小时）";
     }
 
     // ---------------------------------------------------------------- 权限与链接
 
     private string[] SelectedScopes() =>
-        _scopes.Where(s => s.IsSelected).Select(s => s.Name).ToArray();
+        AllRows.Where(s => s.IsSelected).Select(s => s.Name).ToArray();
 
     private void UpdateHint()
     {
@@ -196,8 +290,11 @@ public partial class TokenPage : UserControl, IRefreshable
         var url = "https://github.com/settings/tokens/new";
         var q = new List<string>();
         if (!string.IsNullOrWhiteSpace(scopes)) q.Add($"scopes={scopes}");
-        var exp = GetExpirationValue();
-        if (exp != null) q.Add($"expiration={Uri.EscapeDataString(exp)}");
+        var opt = ExpirationCombo.SelectedItem as ExpirationOption;
+        if (opt is { Days: not null and not -1 })
+            q.Add($"expiration={DateOnly.FromDateTime(DateTime.Today.AddDays(opt.Days.Value)):yyyy-MM-dd}");
+        else if (opt?.Days == -1 && DateOnly.TryParseExact(ExpirationDate.Text.Trim(), "yyyy-MM-dd", out var d))
+            q.Add($"expiration={d:yyyy-MM-dd}");
         q.Add($"description={desc}");
         return q.Count > 0 ? $"{url}?{string.Join("&", q)}" : url;
     }
@@ -304,7 +401,11 @@ public partial class TokenPage : UserControl, IRefreshable
 
             var scopes = await _api.GetScopesAsync(token, CancellationToken.None).ConfigureAwait(true);
 
-            SecureStore.SetToken(acc.Login, token);
+            // 记录到期时间：只有本页选择过有效期的 classic token 才有；gco_/gho_ 设备流 token 无期限
+            DateTimeOffset? expiresAt = token.StartsWith("ghp_", StringComparison.Ordinal)
+                ? GetExpiration() : null;
+
+            SecureStore.SetToken(acc.Login, token, expiresAt);
             TokenInput.Text = "";
 
             TokenStatus.Text = scopes.Length == 0
@@ -373,6 +474,33 @@ public partial class TokenPage : UserControl, IRefreshable
         TokenStatus.Text = "已删除本地 token。";
         _window.NotifyChanged();
     }
+}
+
+/// <summary>权限分类分组（可折叠）。</summary>
+public sealed class ScopeGroup : INotifyPropertyChanged
+{
+    private string _summary = "";
+
+    public string Title { get; set; } = "";
+    public ObservableCollection<ScopeRow> Rows { get; } = new();
+    public bool IsExpanded { get; set; }
+
+    /// <summary>收起时在标题旁显示已勾选的 scope 名，如「repo, workflow」。</summary>
+    public string Summary
+    {
+        get => _summary;
+        private set { _summary = value; Raise(); }
+    }
+
+    public void RefreshSummary()
+    {
+        var picked = Rows.Where(r => r.IsSelected).Select(r => r.Name).ToList();
+        Summary = picked.Count == 0 ? "未选择" : string.Join(", ", picked);
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+    private void Raise([CallerMemberName] string? name = null) =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }
 
 /// <summary>权限列表的一行，支持勾选。</summary>

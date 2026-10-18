@@ -117,13 +117,27 @@ public static class SecureStore
         System.IO.File.WriteAllBytes(SecretsFile, cipher);
     }
 
-    public static void SetToken(string login, string token)
+    public static void SetToken(string login, string token, DateTimeOffset? expiresAt = null)
     {
         lock (Gate)
         {
             var map = LoadAll();
             map[login.ToLowerInvariant()] = token;
             SaveAll(map);
+
+            var meta = LoadMeta();
+            if (expiresAt.HasValue) meta[login.ToLowerInvariant()] = expiresAt.Value;
+            else meta.Remove(login.ToLowerInvariant());
+            SaveMeta(meta);
+        }
+    }
+
+    /// <summary>该账号已保存 token 的到期时间；null = 永不过期或未知。</summary>
+    public static DateTimeOffset? GetExpiration(string login)
+    {
+        lock (Gate)
+        {
+            return LoadMeta().TryGetValue(login.ToLowerInvariant(), out var t) ? t : null;
         }
     }
 
@@ -144,6 +158,33 @@ public static class SecureStore
         {
             var map = LoadAll();
             if (map.Remove(login.ToLowerInvariant())) SaveAll(map);
+            var meta = LoadMeta();
+            if (meta.Remove(login.ToLowerInvariant())) SaveMeta(meta);
         }
+    }
+
+    // ---- 到期时间元数据（同样 DPAPI 保护，存独立文件，兼容旧 secrets.bin）----
+
+    private static string MetaFile => System.IO.Path.Combine(AppPaths.Root, "token_meta.bin");
+
+    private static Dictionary<string, DateTimeOffset> LoadMeta()
+    {
+        try
+        {
+            if (!System.IO.File.Exists(MetaFile)) return new();
+            var plain = Unprotect(System.IO.File.ReadAllBytes(MetaFile));
+            if (plain == null) return new();
+            return JsonSerializer.Deserialize<Dictionary<string, DateTimeOffset>>(
+                Encoding.UTF8.GetString(plain)) ?? new();
+        }
+        catch { return new(); }
+    }
+
+    private static void SaveMeta(Dictionary<string, DateTimeOffset> map)
+    {
+        AppPaths.EnsureRoot();
+        var cipher = Protect(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(map)));
+        if (cipher == null) return;
+        System.IO.File.WriteAllBytes(MetaFile, cipher);
     }
 }

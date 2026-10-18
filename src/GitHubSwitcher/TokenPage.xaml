@@ -29,32 +29,58 @@
                 <!-- 选择权限 -->
                 <Border Style="{StaticResource Card}" Margin="0,0,0,12">
                     <StackPanel>
-                        <TextBlock Text="选择权限（scopes）" Style="{StaticResource H2}"/>
+                        <Grid>
+                            <TextBlock Text="选择权限（scopes）" Style="{StaticResource H2}"
+                                       HorizontalAlignment="Left"/>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
+                                        VerticalAlignment="Top">
+                                <Button Content="全选" Click="SelectAll_Click" Padding="12,3" MinWidth="0"/>
+                                <Button Content="全不选" Click="SelectNone_Click" Padding="12,3" MinWidth="0"
+                                        Margin="8,0,0,0"/>
+                                <Button Content="恢复默认" Click="SelectDefault_Click" Padding="12,3" MinWidth="0"
+                                        Margin="8,0,0,0"/>
+                            </StackPanel>
+                        </Grid>
                         <TextBlock Style="{StaticResource Sub}" Margin="0,5,0,10"
-                                   Text="默认已勾选推送代码所需的最小集合。带「危险」标记的请谨慎勾选。"/>
-                        <ItemsControl x:Name="ScopeList">
+                                   Text="按分类折叠展示，点分类名展开。勾选 admin:* 会自动包含对应的 read:/write:* 并标注。"/>
+                        <ItemsControl x:Name="GroupList">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
-                                              Margin="0,0,0,7">
-                                        <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{Binding Name}" FontFamily="Consolas"
-                                                       FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                            <TextBlock Text="{Binding Description}" Style="{StaticResource Sub}"
-                                                       Margin="10,0,0,0" VerticalAlignment="Center"/>
-                                            <Border Background="#FDECEA" CornerRadius="4" Padding="5,0"
-                                                    Margin="8,0,0,0" VerticalAlignment="Center"
-                                                    Visibility="{Binding DangerVisibility}">
-                                                <TextBlock Text="危险" FontSize="10"
-                                                           Foreground="{StaticResource DangerBrush}"/>
-                                            </Border>
-                                            <Border Background="#EAF3FD" CornerRadius="4" Padding="5,0"
-                                                    Margin="6,0,0,0" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding IncludedHint}" FontSize="10"
-                                                           Foreground="#2563A8"/>
-                                            </Border>
-                                        </StackPanel>
-                                    </CheckBox>
+                                    <Expander Margin="0,0,0,4" IsExpanded="{Binding IsExpanded}">
+                                        <Expander.Header>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold"/>
+                                                <TextBlock Text="{Binding Summary}" Margin="8,0,0,0"
+                                                           FontSize="11.5" Foreground="#616B76"/>
+                                            </StackPanel>
+                                        </Expander.Header>
+                                        <ItemsControl ItemsSource="{Binding Rows}" Margin="14,4,0,4">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                                              Margin="0,0,0,7">
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <TextBlock Text="{Binding Name}" FontFamily="Consolas"
+                                                                       FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                                            <TextBlock Text="{Binding Description}" Style="{StaticResource Sub}"
+                                                                       Margin="10,0,0,0" VerticalAlignment="Center"/>
+                                                            <Border Background="#FDECEA" CornerRadius="4" Padding="5,0"
+                                                                    Margin="8,0,0,0" VerticalAlignment="Center"
+                                                                    Visibility="{Binding DangerVisibility}">
+                                                                <TextBlock Text="危险" FontSize="10"
+                                                                           Foreground="{StaticResource DangerBrush}"/>
+                                                            </Border>
+                                                            <Border Background="#EAF3FD" CornerRadius="4" Padding="5,0"
+                                                                    Margin="6,0,0,0" VerticalAlignment="Center">
+                                                                <TextBlock Text="{Binding IncludedHint}" FontSize="10"
+                                                                           Foreground="#2563A8"/>
+                                                            </Border>
+                                                        </StackPanel>
+                                                    </CheckBox>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </Expander>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
@@ -112,6 +138,7 @@
                         <TextBlock Text="该账号已保存的 token" Style="{StaticResource H2}"/>
                         <TextBox x:Name="ExistingToken" IsReadOnly="True" Margin="0,10,0,0"
                                  FontFamily="Consolas" Padding="10,9"/>
+                        <TextBlock x:Name="ExpirationInfo" Margin="0,10,0,0" FontSize="13"/>
                         <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
                             <Button Content="复制" Style="{StaticResource GhostButton}" Click="CopyExisting_Click"/>
                             <Button Content="删除此 token" Style="{StaticResource GhostButton}"
