@@ -1,0 +1,39 @@
+# ---- 构建产物 ----
+bin/
+obj/
+dist/
+dist_sc/
+dist_new/
+publish/
+*.user
+
+# ---- 单文件发布生成的临时目录 ----
+**/bin-*/**
+**/publish-*/**
+
+# ---- Visual Studio / Rider ----
+.vs/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# ---- 图标生成过程的中间产物（保留 app.ico / app.png）----
+src/GitHubSwitcher/Assets/preview_*.png
+
+# ---- 运行时数据（千万不要提交）----
+# 账号列表与加密凭据只存在用户目录，绝不会在仓库里，
+# 但为防止手动拷贝进来，这里再兜一层。
+accounts.json
+secrets.bin
+browser-snapshots/
+
+# ---- 系统文件 ----
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# ---- 临时 ----
+*.log
+*.tmp

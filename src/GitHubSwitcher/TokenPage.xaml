@@ -1,0 +1,110 @@
+<UserControl x:Class="GitHubSwitcher.TokenPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid Margin="26,22,26,20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Margin="0,0,0,14">
+            <TextBlock Text="创建 Token" Style="{StaticResource H1}"/>
+            <TextBlock Style="{StaticResource Sub}" Margin="0,5,0,0"
+                       Text="勾选需要的权限，程序会生成一个已预填这些权限的 GitHub 页面链接，并直接在该账号的浏览器窗口里打开。"/>
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+
+                <!-- 选择账号 -->
+                <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock Text="为哪个账号创建" Style="{StaticResource H2}"/>
+                        <ComboBox x:Name="AccountCombo" Margin="0,10,0,0" Padding="10,7"
+                                  DisplayMemberPath="DisplayName"
+                                  SelectionChanged="AccountCombo_SelectionChanged"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- 选择权限 -->
+                <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock Text="选择权限（scopes）" Style="{StaticResource H2}"/>
+                        <TextBlock Style="{StaticResource Sub}" Margin="0,5,0,10"
+                                   Text="默认已勾选推送代码所需的最小集合。带「危险」标记的请谨慎勾选。"/>
+                        <ItemsControl x:Name="ScopeList">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                              Margin="0,0,0,7">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{Binding Name}" FontFamily="Consolas"
+                                                       FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding Description}" Style="{StaticResource Sub}"
+                                                       Margin="10,0,0,0" VerticalAlignment="Center"/>
+                                            <Border Background="#FDECEA" CornerRadius="4" Padding="5,0"
+                                                    Margin="8,0,0,0" VerticalAlignment="Center"
+                                                    Visibility="{Binding DangerVisibility}">
+                                                <TextBlock Text="危险" FontSize="10"
+                                                           Foreground="{StaticResource DangerBrush}"/>
+                                            </Border>
+                                        </StackPanel>
+                                    </CheckBox>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <TextBlock x:Name="ScopeHint" Style="{StaticResource Sub}" Margin="0,10,0,0"/>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                            <Button Content="打开创建页面" Click="Create_Click" MinWidth="140"/>
+                            <Button Content="只生成链接" Style="{StaticResource GhostButton}"
+                                    Margin="10,0,0,0" Click="BuildLink_Click"/>
+                            <Button Content="复制链接" Style="{StaticResource GhostButton}"
+                                    Margin="10,0,0,0" Click="CopyLink_Click"/>
+                        </StackPanel>
+
+                        <TextBox x:Name="LinkPreview" IsReadOnly="True" Margin="0,10,0,0"
+                                 FontSize="11.5" TextWrapping="Wrap" MaxHeight="70"
+                                 Text="" VerticalScrollBarVisibility="Auto"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- 粘贴回来 -->
+                <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock Text="把生成的 token 粘贴回来" Style="{StaticResource H2}"/>
+                        <TextBlock Style="{StaticResource Sub}" Margin="0,5,0,10"
+                                   Text="点击页面底部的 Generate token 后，复制那串以 ghp_ 开头的字符粘到这里，程序会校验它的真实权限并保存。"/>
+                        <TextBox x:Name="TokenInput" Padding="10,9" FontFamily="Consolas"
+                                 Text="" />
+                        <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                            <Button Content="校验并保存" Click="SaveToken_Click" MinWidth="120"/>
+                            <Button Content="复制" Style="{StaticResource GhostButton}"
+                                    Margin="10,0,0,0" Click="CopyToken_Click"/>
+                            <Button Content="清空" Style="{StaticResource GhostButton}"
+                                    Margin="10,0,0,0" Click="ClearToken_Click"/>
+                        </StackPanel>
+                        <TextBlock x:Name="TokenStatus" Style="{StaticResource Sub}" Margin="0,10,0,0"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- 已有 token -->
+                <Border x:Name="ExistingCard" Style="{StaticResource Card}" Visibility="Collapsed">
+                    <StackPanel>
+                        <TextBlock Text="该账号已保存的 token" Style="{StaticResource H2}"/>
+                        <TextBox x:Name="ExistingToken" IsReadOnly="True" Margin="0,10,0,0"
+                                 FontFamily="Consolas" Padding="10,9"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                            <Button Content="复制" Style="{StaticResource GhostButton}" Click="CopyExisting_Click"/>
+                            <Button Content="删除此 token" Style="{StaticResource GhostButton}"
+                                    Margin="10,0,0,0" Click="DeleteExisting_Click"/>
+                        </StackPanel>
+                        <TextBlock x:Name="ExistingScopes" Style="{StaticResource Sub}" Margin="0,10,0,0"/>
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>
