@@ -1,10 +1,11 @@
 using System;
 using System.IO;
-using System.Threading;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using GitHubSwitcher.Models;
 using GitHubSwitcher.Services;
 
@@ -33,6 +34,160 @@ public partial class AddAccountPage : UserControl, IRefreshable
     }
 
     private string _pendingChromeDir = "";
+
+    /// <summary>扫描浏览器里已登录的 GitHub 账号，可直接导入免去重复授权。</summary>
+    private async void Scan_Click(object sender, RoutedEventArgs e)
+    {
+        ScanBtn.IsEnabled = false;
+        ScanStatus.Text = "正在读取浏览器登录态…";
+        SessionList.Children.Clear();
+
+        try
+        {
+            var (sessions, error) = await ChromeSessionScanner.ScanAsync().ConfigureAwait(true);
+
+            if (error != null) { ScanStatus.Text = error; return; }
+
+            if (sessions.Count == 0)
+            {
+                ScanStatus.Text = "没有在浏览器里找到已登录的 GitHub 账号。请用下面第 2 步的授权码方式登录。";
+                return;
+            }
+
+            var verified = sessions.Count(x => x.Verified);
+            ScanStatus.Text = $"找到 {sessions.Count} 个已登录账号，其中 {verified} 个校验通过。";
+
+            foreach (var s in sessions)
+                SessionList.Children.Add(BuildSessionRow(s));
+        }
+        catch (Exception ex)
+        {
+            ScanStatus.Text = $"扫描失败：{ex.Message}";
+        }
+        finally
+        {
+            ScanBtn.IsEnabled = true;
+        }
+    }
+
+    private UIElement BuildSessionRow(DetectedSession s)
+    {
+        var border = new Border
+        {
+            Background = (Brush)Application.Current.Resources["CodeBgBrush"],
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(12, 10, 12, 10),
+            Margin = new Thickness(0, 0, 0, 8)
+        };
+
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var info = new StackPanel();
+        var title = new StackPanel { Orientation = Orientation.Horizontal };
+        title.Children.Add(new TextBlock
+        {
+            Text = string.IsNullOrWhiteSpace(s.Login) ? $"（未知账号 id={s.UserId}）" : s.Login,
+            FontWeight = FontWeights.SemiBold,
+            FontSize = 13.5,
+            VerticalAlignment = VerticalAlignment.Center
+        });
+
+        if (s.IsCurrent)
+        {
+            var badge = new Border
+            {
+                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E4EDFD")),
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(6, 1, 6, 1),
+                Margin = new Thickness(8, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            badge.Child = new TextBlock
+            {
+                Text = "当前使用",
+                FontSize = 11,
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2F6FEB"))
+            };
+            title.Children.Add(badge);
+        }
+        info.Children.Add(title);
+
+        info.Children.Add(new TextBlock
+        {
+            Text = s.Verified ? "会话有效，可直接导入" : $"会话不可用：{s.Error ?? "校验失败"}",
+            FontSize = 12,
+            Margin = new Thickness(0, 3, 0, 0),
+            Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(
+                s.Verified ? "#616B76" : "#C0392B"))
+        });
+        Grid.SetColumn(info, 0);
+        grid.Children.Add(info);
+
+        var btn = new Button
+        {
+            Content = "直接导入",
+            MinWidth = 96,
+            IsEnabled = s.Verified,
+            VerticalAlignment = VerticalAlignment.Center,
+            Tag = s
+        };
+        btn.Click += ImportSession_Click;
+        Grid.SetColumn(btn, 1);
+        grid.Children.Add(btn);
+
+        border.Child = grid;
+        return border;
+    }
+
+    /// <summary>导入会话：把浏览器登录态复制进该账号隔离目录并保存记录。</summary>
+    private async void ImportSession_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button btn || btn.Tag is not DetectedSession s) return;
+        if (!s.Verified || string.IsNullOrWhiteSpace(s.Login)) return;
+
+        btn.IsEnabled = false;
+        ScanStatus.Text = $"正在导入 {s.Login}…";
+
+        try
+        {
+            var targetDir = AppPaths.ChromeDirFor(s.Login);
+            var copyResult = await Task.Run(() =>
+                BrowserProfileService.CopyLoginStateToAccount(s.Login)).ConfigureAwait(true);
+
+            var account = new Account
+            {
+                Login = s.Login,
+                Label = s.Login,
+                Email = $"{(string.IsNullOrEmpty(s.UserId) ? "0" : s.UserId)}+{s.Login}@users.noreply.github.com",
+                GitHubId = long.TryParse(s.UserId, out var gid) ? gid : 0,
+                ChromeUserDataDir = targetDir
+            };
+
+            App.Store.AddOrUpdate(account);
+
+            if (string.IsNullOrWhiteSpace(App.Store.Data.ActiveLogin))
+            {
+                App.Store.SetActive(s.Login);
+                await GitConfig.ApplyIdentityAsync(account).ConfigureAwait(true);
+            }
+
+            ScanStatus.Text = copyResult
+                ? $"已导入 {s.Login}。浏览器登录态就绪；命令行请到「创建 Token」页生成一次。"
+                : $"已记录 {s.Login}，但登录态复制未成功。";
+
+            _window.NotifyChanged();
+        }
+        catch (Exception ex)
+        {
+            ScanStatus.Text = $"导入失败：{ex.Message}";
+        }
+        finally
+        {
+            btn.IsEnabled = true;
+        }
+    }
 
     private async void Start_Click(object sender, RoutedEventArgs e)
     {

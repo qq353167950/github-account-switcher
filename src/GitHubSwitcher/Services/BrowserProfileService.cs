@@ -162,6 +162,59 @@ public sealed class BrowserProfileService
         catch { return false; }
     }
 
+    /// <summary>
+    /// 把日常 Chrome 的 GitHub 登录态复制进指定账号的隔离目录。
+    /// 用于「扫描已登录账号 → 直接导入」：这样该账号窗口打开时就是已登录状态。
+    /// </summary>
+    public static bool CopyLoginStateToAccount(string login)
+    {
+        try
+        {
+            var srcDb = ChromeCookieStore.FindCookiesDb(DefaultUserDataDir);
+            var srcKey = ChromeCookieStore.TryGetMasterKey(DefaultUserDataDir);
+            if (srcDb == null || srcKey == null) return false;
+
+            var cookies = ChromeCookieStore.ReadGitHubCookies(srcDb);
+            if (cookies.Count == 0) return false;
+
+            // 目标是该账号的隔离目录：需要有自己的 Local State（含独立密钥）
+            var targetRoot = AppPaths.ChromeDirFor(login);
+            var targetProfileDir = Path.Combine(targetRoot, "Default", "Network");
+            Directory.CreateDirectory(targetProfileDir);
+
+            var targetDb = Path.Combine(targetProfileDir, "Cookies");
+            if (!File.Exists(targetDb))
+            {
+                // 复制一份库结构（空表即可），再写入 cookie
+                File.Copy(srcDb, targetDb, overwrite: true);
+            }
+
+            // 目标目录若没有 Local State，就复制源目录的，
+            // 这样两边的 master key 一致，密文可以直接沿用。
+            var targetLocalState = Path.Combine(targetRoot, "Local State");
+            var srcLocalState = Path.Combine(DefaultUserDataDir, "Local State");
+            var sameKey = false;
+            if (!File.Exists(targetLocalState) && File.Exists(srcLocalState))
+            {
+                File.Copy(srcLocalState, targetLocalState, overwrite: true);
+                sameKey = true;
+            }
+            else
+            {
+                var tKey = ChromeCookieStore.TryGetMasterKey(targetRoot);
+                sameKey = tKey != null && tKey.AsSpan().SequenceEqual(srcKey);
+            }
+
+            var dstKey = ChromeCookieStore.TryGetMasterKey(targetRoot) ?? srcKey;
+            ChromeCookieStore.ReplaceGitHubCookies(targetDb, srcKey, dstKey, cookies);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     public static bool HasBackup(string profileDir = DefaultProfileDir) =>
         File.Exists(SnapshotPath(profileDir));
 

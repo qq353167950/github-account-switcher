@@ -16,10 +16,34 @@
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <StackPanel>
 
-                <!-- 第一步：发起登录 -->
+                <!-- 第 1 步：直接导入浏览器里已登录的账号 -->
                 <Border Style="{StaticResource Card}" Margin="0,0,0,12">
                     <StackPanel>
-                        <TextBlock Text="第 1 步 · 发起登录" Style="{StaticResource H2}"/>
+                        <TextBlock Text="第 1 步 · 先看看浏览器里已经登录了哪些账号" Style="{StaticResource H2}"/>
+                        <TextBlock Style="{StaticResource Sub}" Margin="0,6,0,10"
+                                   Text="如果这个账号你已经在你常用的 Chrome 里登录过，可以直接导入，不用再走一次授权。"/>
+
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Button x:Name="ScanBtn" Content="扫描已登录账号" Grid.Column="0"
+                                    Click="Scan_Click" MinWidth="150"/>
+                            <TextBlock x:Name="ScanStatus" Style="{StaticResource Sub}"
+                                       Grid.Column="1"
+                                       VerticalAlignment="Center" Margin="12,0,0,0"
+                                       TextWrapping="Wrap"/>
+                        </Grid>
+
+                        <StackPanel x:Name="SessionList"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- 第 2 步：走设备授权登录新账号 -->
+                <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock Text="第 2 步 · 或者用授权码登录一个新账号" Style="{StaticResource H2}"/>
                         <TextBlock Style="{StaticResource Sub}" Margin="0,6,0,14"
                                    Text="点击后会向 GitHub 申请一次性授权码。全程不需要你输入账号密码给本程序。"/>
 
