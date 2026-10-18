@@ -5,64 +5,55 @@ using System.Text.Json;
 namespace GitHubSwitcher.Services;
 
 /// <summary>
-/// 应用偏好设置。用自管的 JSON 文件持久化（%APPDATA%\GitHubSwitcher\prefs.json），
-/// 避免 ApplicationSettingsBase 在 .NET Core 下需要额外包的问题。
+/// 应用偏好设置。用自管的 JSON 文件持久化（%APPDATA%\GitHubSwitcher\prefs.json）。
 /// </summary>
 public static class Prefs
 {
     private static readonly object Gate = new();
+    private static bool? _closeToTray;
+    private static bool _loaded;
 
-    private static string File => Path.Combine(AppPaths.Root, "prefs.json");
+    private static string FilePath => Path.Combine(AppPaths.Root, "prefs.json");
 
-    private static Dictionary<string, object?> Load()
+    private sealed class PrefsData
+    {
+        public bool CloseToTray { get; set; }
+    }
+
+    private static PrefsData Load()
     {
         try
         {
-            if (!System.IO.File.Exists(File)) return new();
-            return JsonSerializer.Deserialize<Dictionary<string, object?>>(
-                System.IO.File.ReadAllText(File)) ?? new();
+            if (!System.IO.File.Exists(FilePath)) return new();
+            return JsonSerializer.Deserialize<PrefsData>(
+                System.IO.File.ReadAllText(FilePath)) ?? new();
         }
         catch { return new(); }
     }
 
-    private static void Save(Dictionary<string, object?> map)
+    private static void EnsureLoaded()
     {
-        AppPaths.EnsureRoot();
-        System.IO.File.WriteAllText(File, JsonSerializer.Serialize(map));
+        if (_loaded) return;
+        _closeToTray = Load().CloseToTray;
+        _loaded = true;
     }
-
-    private static bool? _closeToTray;
 
     /// <summary>点 X 时是否最小化到托盘。默认 false（直接退出）。</summary>
     public static bool CloseToTray
     {
-        get
-        {
-            lock (Gate)
-            {
-                if (_closeToTray == null)
-                {
-                    var m = Load();
-                    _closeToTray = m.TryGetValue("closeToTray", out var v) && v is bool b && b;
-                    _hasValue = m.ContainsKey("closeToTray");
-                }
-                return _closeToTray.Value;
-            }
-        }
+        get { lock (Gate) { EnsureLoaded(); return _closeToTray!.Value; } }
         set
         {
             lock (Gate)
             {
                 _closeToTray = value;
-                _hasValue = true;
-                var m = Load();
-                m["closeToTray"] = value;
-                Save(m);
+                _loaded = true;
+                AppPaths.EnsureRoot();
+                System.IO.File.WriteAllText(FilePath,
+                    JsonSerializer.Serialize(new PrefsData { CloseToTray = value }));
             }
         }
     }
-
-    private static bool _hasValue;
 
     /// <summary>用户是否已做过选择（决定关闭时是否弹询问框）。</summary>
     public static bool HasCloseChoice
@@ -71,9 +62,13 @@ public static class Prefs
         {
             lock (Gate)
             {
-                if (_hasValue) return true;
-                _ = CloseToTray; // 触发懒加载
-                return _hasValue;
+                if (!_loaded)
+                {
+                    // 文件存在即视为已选择过（文件只在用户选择后写入）
+                    _closeToTray = Load().CloseToTray;
+                    _loaded = true;
+                }
+                return System.IO.File.Exists(FilePath);
             }
         }
     }

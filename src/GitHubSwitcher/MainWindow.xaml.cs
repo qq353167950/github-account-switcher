@@ -40,10 +40,18 @@ public partial class MainWindow : Window
             _tray = new WinForms.NotifyIcon
             {
                 Text = "GitHub 账号切换器",
-                Icon = System.Drawing.Icon.FromHandle(
-                             new System.Drawing.Icon(AppPaths.IconPath, 32, 32).Handle),
                 Visible = false
             };
+            // 从当前 exe 提取图标（Icon 构造函数只认 .ico 文件，不能直接传 exe 路径）
+            try
+            {
+                var exePath = Environment.ProcessPath ?? AppPaths.IconPath;
+                _tray.Icon = System.Drawing.Icon.ExtractAssociatedIcon(exePath);
+            }
+            catch
+            {
+                _tray.Icon = System.Drawing.SystemIcons.Application;
+            }
 
             var menu = new WinForms.ContextMenuStrip();
             menu.Items.Add("打开主窗口", null, (_, _) => RestoreFromTray());
@@ -76,6 +84,8 @@ public partial class MainWindow : Window
 
         try
         {
+            System.IO.File.AppendAllText(System.IO.Path.Combine(AppPaths.Root, "tray_error.log"),
+                $"{DateTime.Now:HH:mm:ss} closing: hasChoice={Prefs.HasCloseChoice} toTray={Prefs.CloseToTray}\n");
             // 点 X：第一次询问用户偏好；之后按记住的选择执行
             if (!Prefs.HasCloseChoice)
             {
