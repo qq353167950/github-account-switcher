@@ -25,11 +25,22 @@ public static class ScopeCatalog
         new() { Name = "user",           Description = "读取与修改个人资料" },
         new() { Name = "notifications",  Description = "读取通知" },
         new() { Name = "write:packages", Description = "发布包到 GitHub Packages" },
-        new() { Name = "delete_repo",    Description = "删除仓库（危险）", IsDangerous = true },
         new() { Name = "admin:org",      Description = "完全管理组织（危险）", IsDangerous = true },
         new() { Name = "admin:repo_hook",Description = "管理仓库 Webhook" },
         new() { Name = "admin:public_key", Description = "管理 SSH 公钥" },
         new() { Name = "project",        Description = "读写 Projects" },
+        new() { Name = "admin:gpg_key",  Description = "完全管理 GPG 签名密钥", IsDangerous = true },
+        new() { Name = "admin:ssh_signing_key", Description = "完全管理 SSH 签名密钥", IsDangerous = true },
+        new() { Name = "admin:enterprise", Description = "完全管理企业账号（危险）", IsDangerous = true },
+        new() { Name = "admin:org_hook", Description = "管理组织 Webhook（危险）", IsDangerous = true },
+        new() { Name = "audit_log",      Description = "读取组织审计日志" },
+        new() { Name = "codespace",      Description = "完全管理 Codespaces" },
+        new() { Name = "copilot",        Description = "管理 GitHub Copilot 订阅与访问" },
+        new() { Name = "write:discussion", Description = "读写 Discussions 讨论" },
+        new() { Name = "write:network_configurations", Description = "修改组织网络配置" },
+        new() { Name = "delete:packages", Description = "删除 GitHub Packages（危险）", IsDangerous = true },
+        new() { Name = "read:packages",  Description = "读取 GitHub Packages" },
+        new() { Name = "delete_repo",    Description = "删除仓库", IsDangerous = true },
     };
 
     public static string[] DefaultScopes =>
