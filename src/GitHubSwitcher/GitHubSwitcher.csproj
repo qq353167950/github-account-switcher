@@ -8,9 +8,9 @@
     <UseWPF>true</UseWPF>
     <AssemblyName>GitHubSwitcher</AssemblyName>
     <RootNamespace>GitHubSwitcher</RootNamespace>
-    <Version>1.4.0</Version>
-    <Product>GitHub �˺��л���</Product>
-    <AssemblyTitle>GitHub �˺��л���</AssemblyTitle>
+    <Version>1.4.1</Version>
+    <Product>GitHub 账号切换器</Product>
+    <AssemblyTitle>GitHub 账号切换器</AssemblyTitle>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
@@ -18,8 +18,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- ����ͼ�����Դ��ȡ -->
+    <!-- 图标（托盘与 exe 资源读取） -->
     <Resource Include="Assets\app.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 托盘图标需要 WinForms（NotifyIcon），不用隐式 using，避免与 WPF 类型冲突 -->
+    <FrameworkReference Include="Microsoft.WindowsDesktop.App.WindowsForms" />
   </ItemGroup>
 
 </Project>

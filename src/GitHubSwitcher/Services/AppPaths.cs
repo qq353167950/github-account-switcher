@@ -27,6 +27,10 @@ public static class AppPaths
         Directory.CreateDirectory(ChromeRoot);
     }
 
+    /// <summary>应用图标绝对路径（托盘图标用）。</summary>
+    public static string IconPath { get; } =
+        Path.Combine(AppContext.BaseDirectory, "GitHubSwitcher.exe");
+
     public static string Sanitize(string name)
     {
         var invalid = Path.GetInvalidFileNameChars();
