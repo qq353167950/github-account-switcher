@@ -8,7 +8,7 @@
     <UseWPF>true</UseWPF>
     <AssemblyName>GitHubSwitcher</AssemblyName>
     <RootNamespace>GitHubSwitcher</RootNamespace>
-    <Version>1.4.1</Version>
+    <Version>1.4.2</Version>
     <Product>GitHub 账号切换器</Product>
     <AssemblyTitle>GitHub 账号切换器</AssemblyTitle>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>

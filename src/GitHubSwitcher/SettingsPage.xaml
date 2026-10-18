@@ -64,6 +64,17 @@
                     </StackPanel>
                 </Border>
 
+                <!-- 常规 -->
+                <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock Text="常规" Style="{StaticResource H2}"/>
+                        <CheckBox x:Name="CloseToTrayCheck" Content="点击关闭按钮时最小化到托盘（不勾选则退出程序）"
+                                  Margin="0,10,0,0" Checked="CloseToTray_Changed" Unchecked="CloseToTray_Changed"/>
+                        <TextBlock Style="{StaticResource Sub}" Margin="0,6,0,0"
+                                   Text="最小化后程序在右下角托盘运行，双击托盘图标可还原窗口。"/>
+                    </StackPanel>
+                </Border>
+
                 <!-- 环境自检 -->
                 <Border Style="{StaticResource Card}">
                     <StackPanel>

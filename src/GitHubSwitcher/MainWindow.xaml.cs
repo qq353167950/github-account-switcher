@@ -123,7 +123,8 @@ public partial class MainWindow : Window
     {
         _realExit = true;
         if (_tray != null) { _tray.Visible = false; _tray.Dispose(); _tray = null; }
-        Close();
+        // 不能在这里调 Close()——正在 Closing 事件中，会抛
+        // "Cannot set Visibility ... while a Window is closing"
         System.Windows.Application.Current.Shutdown();
     }
 

@@ -18,8 +18,15 @@ public partial class SettingsPage : UserControl, IRefreshable
 
     private bool _checked;
 
+    private bool _suppressPrefSync;
+
     public void Refresh()
     {
+        // 常规偏好（只在进入页面时回读一次，用户改动立即生效并保存）
+        _suppressPrefSync = true;
+        CloseToTrayCheck.IsChecked = Prefs.CloseToTray;
+        _suppressPrefSync = false;
+
         if (!_checked)
         {
             // 不在导航时自动检测（检测要读注册表、SQLite、解密主密钥，耗时明显）。
@@ -32,6 +39,14 @@ public partial class SettingsPage : UserControl, IRefreshable
         }
         UpdateAbe();
         UpdateDiagnostics();
+    }
+
+    // ---------------------------------------------------------------- 常规偏好
+
+    private void CloseToTray_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_suppressPrefSync) return;
+        Prefs.CloseToTray = CloseToTrayCheck.IsChecked == true;
     }
 
     // ---------------------------------------------------------------- ABE 状态
