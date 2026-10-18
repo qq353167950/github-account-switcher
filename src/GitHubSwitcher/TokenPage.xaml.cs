@@ -18,6 +18,7 @@ public partial class TokenPage : UserControl, IRefreshable
     private readonly MainWindow _window;
     private readonly GitHubApi _api = new();
     private readonly ObservableCollection<ScopeRow> _scopes = new();
+    private bool _syncing;
 
     public TokenPage(MainWindow window)
     {
@@ -35,9 +36,48 @@ public partial class TokenPage : UserControl, IRefreshable
             });
         }
         ScopeList.ItemsSource = _scopes;
-        foreach (var r in _scopes) r.PropertyChanged += (_, _) => UpdateHint();
+        foreach (var r in _scopes) r.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(ScopeRow.IsSelected)) ApplyImplication(r);
+            UpdateHint();
+        };
 
         UpdateHint();
+    }
+
+    /// <summary>勾选 admin:* 时自动勾选被蕴含的 read:/write:* 并标注；取消时随之取消。</summary>
+    private void ApplyImplication(ScopeRow changed)
+    {
+        if (_syncing) return;
+        _syncing = true;
+        try
+        {
+            if (changed.IsSelected &&
+                ScopeCatalog.Implies.TryGetValue(changed.Name, out var children))
+            {
+                foreach (var c in children)
+                {
+                    var row = _scopes.FirstOrDefault(s =>
+                        string.Equals(s.Name, c, StringComparison.OrdinalIgnoreCase));
+                    if (row == null) continue; // repo 的子项不在 UI 列表里
+                    row.IsSelected = true;
+                    row.IncludedBy = changed.Name;
+                }
+            }
+            else if (!changed.IsSelected)
+            {
+                foreach (var row in _scopes.Where(s => s.IncludedBy == changed.Name))
+                {
+                    row.IncludedBy = "";
+                    row.IsSelected = false;
+                }
+            }
+
+            // 子项被单独取消时，清掉它的包含标注（父项勾选保持不变）
+            if (!changed.IsSelected && !string.IsNullOrEmpty(changed.IncludedBy))
+                changed.IncludedBy = "";
+        }
+        finally { _syncing = false; }
     }
 
     /// <summary>选中指定账号（供「导入账号」后直接跳转过来使用）。</summary>
@@ -294,6 +334,7 @@ public partial class TokenPage : UserControl, IRefreshable
 public sealed class ScopeRow : INotifyPropertyChanged
 {
     private bool _isSelected;
+    private string _includedBy = "";
 
     public string Name { get; set; } = "";
     public string Description { get; set; } = "";
@@ -309,6 +350,22 @@ public sealed class ScopeRow : INotifyPropertyChanged
             Raise();
         }
     }
+
+    /// <summary>非空表示本行是被某个父 scope（如 admin:org）自动包含勾选的。</summary>
+    public string IncludedBy
+    {
+        get => _includedBy;
+        set
+        {
+            if (_includedBy == value) return;
+            _includedBy = value;
+            Raise();
+            Raise(nameof(IncludedHint));
+        }
+    }
+
+    public string IncludedHint =>
+        string.IsNullOrEmpty(IncludedBy) ? "" : $"已包含于 {IncludedBy}";
 
     public Visibility DangerVisibility => IsDangerous ? Visibility.Visible : Visibility.Collapsed;
 

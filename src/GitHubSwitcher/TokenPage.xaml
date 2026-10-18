@@ -48,6 +48,11 @@
                                                 <TextBlock Text="危险" FontSize="10"
                                                            Foreground="{StaticResource DangerBrush}"/>
                                             </Border>
+                                            <Border Background="#EAF3FD" CornerRadius="4" Padding="5,0"
+                                                    Margin="6,0,0,0" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding IncludedHint}" FontSize="10"
+                                                           Foreground="#2563A8"/>
+                                            </Border>
                                         </StackPanel>
                                     </CheckBox>
                                 </DataTemplate>

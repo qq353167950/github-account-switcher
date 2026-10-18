@@ -1,4 +1,4 @@
-ï»¿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -8,9 +8,9 @@
     <UseWPF>true</UseWPF>
     <AssemblyName>GitHubSwitcher</AssemblyName>
     <RootNamespace>GitHubSwitcher</RootNamespace>
-    <Version>1.3.0</Version>
-    <Product>GitHub è´¦å·åˆ‡æ¢å™¨</Product>
-    <AssemblyTitle>GitHub è´¦å·åˆ‡æ¢å™¨</AssemblyTitle>
+    <Version>1.3.1</Version>
+    <Product>GitHub ÕËºÅÇĞ»»Æ÷</Product>
+    <AssemblyTitle>GitHub ÕËºÅÇĞ»»Æ÷</AssemblyTitle>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
@@ -18,7 +18,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- çª—å£å›¾æ ‡ä»èµ„æºè¯»å– -->
+    <!-- ´°¿ÚÍ¼±ê´Ó×ÊÔ´¶ÁÈ¡ -->
     <Resource Include="Assets\app.ico" />
   </ItemGroup>
 
