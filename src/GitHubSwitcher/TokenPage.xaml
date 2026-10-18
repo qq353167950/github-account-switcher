@@ -59,6 +59,18 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
 
+                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                            <TextBlock Text="有效期" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <ComboBox x:Name="ExpirationCombo" Width="180" Padding="10,6"
+                                      DisplayMemberPath="Label"
+                                      SelectionChanged="ExpirationCombo_SelectionChanged"/>
+                            <TextBox x:Name="ExpirationDate" Width="120" Margin="8,0,0,0" Padding="8,5"
+                                     Visibility="Collapsed" ToolTip="格式：YYYY-MM-DD"/>
+                            <TextBlock x:Name="ExpirationHint" Style="{StaticResource Sub}"
+                                       Margin="10,0,0,0" VerticalAlignment="Center"
+                                       Text="留空表示无期限"/>
+                        </StackPanel>
+
                         <TextBlock x:Name="ScopeHint" Style="{StaticResource Sub}" Margin="0,10,0,0"/>
 
                         <StackPanel Orientation="Horizontal" Margin="0,14,0,0">

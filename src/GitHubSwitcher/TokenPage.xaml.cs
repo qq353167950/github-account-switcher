@@ -42,7 +42,50 @@ public partial class TokenPage : UserControl, IRefreshable
             UpdateHint();
         };
 
+        // 有效期选项（value 为天数；null = 无期限；-1 = 自定义日期）
+        ExpirationCombo.ItemsSource = new List<ExpirationOption>
+        {
+            new() { Label = "无期限（不过期）", Days = null },
+            new() { Label = "7 天",   Days = 7 },
+            new() { Label = "30 天",  Days = 30 },
+            new() { Label = "60 天",  Days = 60 },
+            new() { Label = "90 天",  Days = 90 },
+            new() { Label = "自定义日期…", Days = -1 },
+        };
+        ExpirationCombo.SelectedIndex = 0;
+
         UpdateHint();
+    }
+
+    private void ExpirationCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (ExpirationDate == null) return;
+        var opt = ExpirationCombo.SelectedItem as ExpirationOption;
+        var custom = opt?.Days == -1;
+        ExpirationDate.Visibility = custom ? Visibility.Visible : Visibility.Collapsed;
+        ExpirationHint.Text = custom
+            ? "输入具体日期，格式 YYYY-MM-DD"
+            : (opt?.Days == null ? "token 永不过期" : $"token 将在 {opt!.Days} 天后过期");
+    }
+
+    /// <summary>返回 expiration 查询参数值；null 表示不加该参数（无期限）。</summary>
+    private string? GetExpirationValue()
+    {
+        var opt = ExpirationCombo.SelectedItem as ExpirationOption;
+        if (opt == null || opt.Days == null) return null; // 无期限
+        if (opt.Days == -1)
+        {
+            var d = ExpirationDate.Text.Trim();
+            return DateOnly.TryParseExact(d, "yyyy-MM-dd", out var parsed)
+                ? parsed.ToString("yyyy-MM-dd") : d; // 非法格式原样带过去，让 GitHub 页面提示
+        }
+        return DateOnly.FromDateTime(DateTime.Today.AddDays(opt.Days.Value)).ToString("yyyy-MM-dd");
+    }
+
+    private sealed class ExpirationOption
+    {
+        public string Label { get; init; } = "";
+        public int? Days { get; init; }
     }
 
     /// <summary>勾选 admin:* 时自动勾选被蕴含的 read:/write:* 并标注；取消时随之取消。</summary>
@@ -153,6 +196,8 @@ public partial class TokenPage : UserControl, IRefreshable
         var url = "https://github.com/settings/tokens/new";
         var q = new List<string>();
         if (!string.IsNullOrWhiteSpace(scopes)) q.Add($"scopes={scopes}");
+        var exp = GetExpirationValue();
+        if (exp != null) q.Add($"expiration={Uri.EscapeDataString(exp)}");
         q.Add($"description={desc}");
         return q.Count > 0 ? $"{url}?{string.Join("&", q)}" : url;
     }

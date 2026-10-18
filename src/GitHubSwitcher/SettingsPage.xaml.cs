@@ -16,8 +16,20 @@ public partial class SettingsPage : UserControl, IRefreshable
         _window = window;
     }
 
+    private bool _checked;
+
     public void Refresh()
     {
+        if (!_checked)
+        {
+            // 不在导航时自动检测（检测要读注册表、SQLite、解密主密钥，耗时明显）。
+            // 只显示提示，等用户点「重新检测」。
+            SetBadge("未检测", "#F0F2F5", "#616B76");
+            DiagFooter.Text = "尚未检测。点「重新检测」开始检查环境。";
+            DiagFooter.Foreground = new SolidColorBrush(
+                (Color)ColorConverter.ConvertFromString("#616B76"));
+            return;
+        }
         UpdateAbe();
         UpdateDiagnostics();
     }
@@ -189,6 +201,7 @@ public partial class SettingsPage : UserControl, IRefreshable
     /// </summary>
     private void Recheck_Click(object sender, RoutedEventArgs e)
     {
+        _checked = true;
         var v20Before = AbeService.CountV20Cookies();
         Refresh();
         var after = AbeService.Inspect();
