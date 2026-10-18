@@ -64,6 +64,14 @@ public partial class MainWindow : Window
         ShowPage(NavSettings);
     }
 
+    /// <summary>跳到「创建 Token」页并预选指定账号。</summary>
+    public void GoToToken(string login)
+    {
+        NavToken.IsChecked = true;
+        ShowPage(NavToken);
+        _tokenPage?.SelectAccount(login);
+    }
+
     private void UpdateSidebar()
     {
         var active = App.Store.Active;

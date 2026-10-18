@@ -154,7 +154,7 @@ public partial class AddAccountPage : UserControl, IRefreshable
         {
             var targetDir = AppPaths.ChromeDirFor(s.Login);
             var copyResult = await Task.Run(() =>
-                BrowserProfileService.CopyLoginStateToAccount(s.Login)).ConfigureAwait(true);
+                BrowserProfileService.CopyLoginStateToAccount(s.Login, s.Token)).ConfigureAwait(true);
 
             var account = new Account
             {
@@ -174,10 +174,20 @@ public partial class AddAccountPage : UserControl, IRefreshable
             }
 
             ScanStatus.Text = copyResult
-                ? $"已导入 {s.Login}。浏览器登录态就绪；命令行请到「创建 Token」页生成一次。"
-                : $"已记录 {s.Login}，但登录态复制未成功。";
+                ? $"已导入 {s.Login}（浏览器已就绪）"
+                : $"已记录 {s.Login}，登录态复制未成功";
 
             _window.NotifyChanged();
+
+            // 浏览器侧就绪后，直接引导去补命令行 token，省得用户自己找入口
+            var go = MessageBox.Show(
+                $"账号 {s.Login} 的浏览器登录态已导入完成。\n\n" +
+                "命令行（git push / gh）还需要一个 token。\n" +
+                "要现在去创建吗？只有 3 步：点「打开创建页面」→ 页面点 Generate token → 粘回来保存。",
+                "浏览器已就绪", MessageBoxButton.YesNo, MessageBoxImage.Question);
+
+            if (go == MessageBoxResult.Yes)
+                _window.GoToToken(s.Login);
         }
         catch (Exception ex)
         {

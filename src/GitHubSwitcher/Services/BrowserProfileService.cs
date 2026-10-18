@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading;
@@ -166,7 +167,7 @@ public sealed class BrowserProfileService
     /// 把日常 Chrome 的 GitHub 登录态复制进指定账号的隔离目录。
     /// 用于「扫描已登录账号 → 直接导入」：这样该账号窗口打开时就是已登录状态。
     /// </summary>
-    public static bool CopyLoginStateToAccount(string login)
+    public static bool CopyLoginStateToAccount(string login, string? sessionToken = null)
     {
         try
         {
@@ -176,6 +177,16 @@ public sealed class BrowserProfileService
 
             var cookies = ChromeCookieStore.ReadGitHubCookies(srcDb);
             if (cookies.Count == 0) return false;
+
+            // 关键：只保留目标账号的登录态，剔除其他账号的会话令牌。
+            // 否则导入 A 账号后，A 的目录里会残留 B/C/D 的令牌，
+            // 其 GitHub 账号切换下拉列表里会看到别人的账号（虽然不会串号，但属于信息泄露）。
+            if (!string.IsNullOrWhiteSpace(sessionToken))
+            {
+                var filtered = FilterToAccount(srcKey, cookies, login, sessionToken);
+                if (filtered.Count == 0) return false;
+                cookies = filtered;
+            }
 
             // 目标是该账号的隔离目录：需要有自己的 Local State（含独立密钥）
             var targetRoot = AppPaths.ChromeDirFor(login);
@@ -213,6 +224,84 @@ public sealed class BrowserProfileService
         {
             return false;
         }
+    }
+
+    /// <summary>
+    /// 把一组 GitHub cookie 裁剪成「只属于目标账号」。
+    ///  - user_session / __Host-user_session_same_site 改写为目标账号的令牌
+    ///  - dotcom_user 改写为账号名
+    ///  - saved_user_sessions 只保留目标账号这一条
+    ///  - 其余非会话类 cookie（_octo、GHCC 等）原样保留
+    /// </summary>
+    private static List<ChromeCookie> FilterToAccount(
+        byte[] key, List<ChromeCookie> cookies, string login, string sessionToken)
+    {
+        var result = new List<ChromeCookie>();
+
+        // 找出目标账号的 id（从 saved_user_sessions 里匹配令牌）
+        string? userId = null;
+        var savedCookie = cookies.FirstOrDefault(c =>
+            string.Equals(c.Name, "saved_user_sessions", StringComparison.OrdinalIgnoreCase));
+
+        if (savedCookie != null)
+        {
+            try
+            {
+                var raw = Encoding.UTF8.GetString(ChromeCookieStore.ExtractValue(
+                    ChromeCookieStore.Decrypt(key, savedCookie.EncryptedValue), savedCookie.HostKey));
+                foreach (var seg in Uri.UnescapeDataString(raw)
+                             .Split('|', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var i = seg.IndexOf(':');
+                    if (i <= 0) continue;
+                    if (seg[(i + 1)..].Trim() == sessionToken)
+                    {
+                        userId = seg[..i].Trim();
+                        break;
+                    }
+                }
+            }
+            catch { }
+        }
+
+        foreach (var c in cookies)
+        {
+            var name = c.Name;
+
+            if (string.Equals(name, "saved_user_sessions", StringComparison.OrdinalIgnoreCase))
+            {
+                if (string.IsNullOrEmpty(userId)) continue;
+                var trimmed = $"{userId}:{sessionToken}";
+                var plain = ChromeCookieStore.BuildPlain(c.HostKey,
+                    Encoding.UTF8.GetBytes(Uri.EscapeDataString(trimmed)));
+                c.EncryptedValue = ChromeCookieStore.Encrypt(key, plain);
+                result.Add(c);
+                continue;
+            }
+
+            if (string.Equals(name, "user_session", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(name, "__Host-user_session_same_site", StringComparison.OrdinalIgnoreCase))
+            {
+                var plain = ChromeCookieStore.BuildPlain(c.HostKey,
+                    Encoding.UTF8.GetBytes(sessionToken));
+                c.EncryptedValue = ChromeCookieStore.Encrypt(key, plain);
+                result.Add(c);
+                continue;
+            }
+
+            if (string.Equals(name, "dotcom_user", StringComparison.OrdinalIgnoreCase))
+            {
+                var plain = ChromeCookieStore.BuildPlain(c.HostKey,
+                    Encoding.UTF8.GetBytes(login));
+                c.EncryptedValue = ChromeCookieStore.Encrypt(key, plain);
+                result.Add(c);
+                continue;
+            }
+
+            result.Add(c);
+        }
+
+        return result;
     }
 
     public static bool HasBackup(string profileDir = DefaultProfileDir) =>

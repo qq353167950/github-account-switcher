@@ -40,6 +40,15 @@ public partial class TokenPage : UserControl, IRefreshable
         UpdateHint();
     }
 
+    /// <summary>选中指定账号（供「导入账号」后直接跳转过来使用）。</summary>
+    public void SelectAccount(string login)
+    {
+        var target = App.Store.Accounts.FirstOrDefault(a =>
+            string.Equals(a.Login, login, StringComparison.OrdinalIgnoreCase));
+        if (target != null) AccountCombo.SelectedItem = target;
+        ShowExisting();
+    }
+
     public void Refresh()
     {
         var keep = (AccountCombo.SelectedItem as Account)?.Login;
